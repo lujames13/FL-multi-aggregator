@@ -1,0 +1,207 @@
+# Blockchain Federated Learning (BFL) Core MVP Features - PRD
+
+## 1. Product Overview
+
+BFL-Cartesi is a research proof-of-concept implementation that demonstrates how blockchain technology can enhance federated learning systems through a challenge mechanism. The minimum viable product (MVP) focuses on simulating multiple aggregators in federated learning with a challenge mechanism to detect and mitigate malicious behavior.
+
+## 2. System Components
+
+### 2.1 Federated Learning Core
+- Multi-aggregator simulation with round-robin selection
+- Client-side model training with CIFAR-10 dataset
+- FedAvg aggregation algorithm implementation
+- Model evaluation metrics tracking
+
+### 2.2 Challenge Mechanism
+- Malicious behavior simulation for selected aggregators
+- Challenge submission and verification framework
+- Metrics collection for challenge effectiveness
+- Validation logic for detecting parameter manipulation
+
+### 2.3 Research Data Collection
+- Detailed metrics logging for research analysis
+- Comparison of scenarios with/without challenges
+- Visualization generation for paper-ready figures
+- Comparative analysis tools for research findings
+
+## 3. Data Models
+
+### 3.1 Aggregator Model
+```json
+{
+  "id": "integer",
+  "is_malicious": "boolean",
+  "selected_rounds": ["array of round_ids"],
+  "challenged_rounds": ["array of round_ids"],
+  "successful_challenges": ["array of round_ids"]
+}
+```
+
+### 3.2 Challenge Model
+```json
+{
+  "id": "integer",
+  "round_id": "integer",
+  "aggregator_id": "integer",
+  "challenger_id": "integer",
+  "timestamp": "ISO-8601 string",
+  "status": "pending|successful|rejected",
+  "verification_metrics": {
+    "parameter_distance": "float",
+    "detection_threshold": "float"
+  }
+}
+```
+
+### 3.3 Research Results Model
+```json
+{
+  "scenario": "string",
+  "total_rounds": "integer",
+  "total_aggregators": "integer",
+  "malicious_aggregators": ["array of aggregator_ids"],
+  "total_challenges": "integer",
+  "successful_challenges": "integer",
+  "challenge_success_rate": "float",
+  "malicious_detection_rate": "float",
+  "detailed_history": ["array of round data"]
+}
+```
+
+## 4. Core Functionality
+
+### 4.1 Multi-Aggregator Simulation
+- Configure multiple virtual aggregators within a single server
+- Implement round-robin selection of aggregators per round
+- Track aggregator performance and selection history
+- Maintain compatibility with existing Flower framework
+
+### 4.2 Malicious Behavior Modeling
+- Configure specific aggregators as malicious via command line
+- Implement parameter manipulation in malicious aggregations
+- Support configurable manipulation strategies
+- Control malicious behavior detection difficulty
+
+### 4.3 Challenge Mechanism
+- Detect and log potentially malicious aggregations
+- Implement verification logic to validate challenges
+- Support configurable challenge success thresholds
+- Compare challenged parameters with honestly computed ones
+
+### 4.4 Research Data Collection
+- Record detailed metrics on challenge effectiveness
+- Track success rates for malicious detection
+- Generate comparative analysis across scenarios
+- Create visualization-ready data for academic papers
+
+## 5. Technical Requirements
+
+### 5.1 System Architecture
+- Extend Flower's FedAvg strategy for multi-aggregator support
+- Implement custom server app for multi-aggregator configuration
+- Design simulation script for different research scenarios
+- Create analysis tools for research data visualization
+
+### 5.2 Implementation Requirements
+- Extend Flower 1.17.0+ with custom strategy class
+- Support Python 3.8+ runtime environment
+- Implement CIFAR-10 dataset with PyTorch models
+- Design for reproducible research experiments
+
+### 5.3 Performance Considerations
+- Support simulation of at least 10 clients and 5 aggregators
+- Complete simulations within reasonable timeframes for research
+- Optimize memory usage for larger model simulations
+- Support different scales of experiment complexity
+
+## 6. Research Experiment Scenarios
+
+### 6.1 Baseline Scenario
+- All honest aggregators (control group)
+- Standard federated learning with multiple aggregators
+- No challenges or malicious behavior
+- Baseline model performance metrics
+
+### 6.2 Malicious Without Challenges
+- Include one or more malicious aggregators
+- Disable challenge mechanism
+- Measure impact on model performance
+- Track malicious aggregation effects
+
+### 6.3 Malicious With Challenges
+- Include one or more malicious aggregators
+- Enable challenge mechanism
+- Measure detection effectiveness
+- Compare with unchallenged scenario
+
+### 6.4 Multiple Malicious Aggregators
+- Configure multiple malicious aggregators
+- Enable challenge mechanism
+- Test detection under complex conditions
+- Analyze effectiveness with varying aggregator counts
+
+## 7. Development Roadmap
+
+### 7.1 Phase 1: Core Simulation Framework
+- Implement MultiAggregatorStrategy class
+- Create server app with multi-aggregator support
+- Develop basic malicious behavior modeling
+- Set up simple challenge detection
+
+### 7.2 Phase 2: Challenge Mechanism Enhancement
+- Implement advanced challenge validation logic
+- Add configurable detection thresholds
+- Create detailed metrics collection
+- Improve malicious behavior simulation
+
+### 7.3 Phase 3: Research Tools
+- Develop visualization and analysis scripts
+- Create comparative metrics reporting
+- Implement paper-ready chart generation
+- Support multiple experiment scenarios
+
+### 7.4 Phase 4: Documentation and Finalization
+- Create comprehensive documentation
+- Write example research workflows
+- Prepare for publication and sharing
+- Finalize research experiment design
+
+## 8. Risks and Mitigations
+
+### 8.1 Technical Challenges
+- **Risk**: Flower framework compatibility issues with custom strategy
+- **Mitigation**: Extensive testing with different Flower versions
+
+### 8.2 Research Validity
+- **Risk**: Simplified simulation may not reflect real-world conditions
+- **Mitigation**: Document limitations and focus on proof-of-concept validation
+
+### 8.3 Performance Issues
+- **Risk**: Large simulations may require significant resources
+- **Mitigation**: Implement configurable simulation scales and optimize for performance
+
+## 9. Appendix
+
+### 9.1 Command Line Parameters
+```
+--scenario: Choose simulation scenario (single|all)
+--clients: Number of federated learning clients
+--rounds: Number of federated learning rounds
+--aggregators: Number of virtual aggregators
+--malicious: Comma-separated list of malicious aggregator IDs
+--challenges: Enable or disable challenge mechanism
+--output-dir: Directory to save results
+--visualize: Generate visualizations after simulation
+```
+
+### 9.2 Visualization Types
+- Challenge effectiveness comparison
+- Aggregator performance visualization
+- Challenge timeline plot
+- Comparative analysis charts
+
+### 9.3 Research Metrics Definitions
+- **Challenge Success Rate**: Percentage of challenges that correctly identified malicious aggregations
+- **Malicious Detection Rate**: Percentage of malicious aggregations that were successfully challenged
+- **Parameter Distance**: Euclidean distance between malicious and honest aggregations
+- **Model Performance Impact**: Effect of malicious aggregations on model accuracy
