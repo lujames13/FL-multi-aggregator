@@ -1,0 +1,18 @@
+{
+  "scenarios": {
+    "aggs3_mal_chalon_20250506_164944": {
+      "total_rounds": 0,
+      "total_aggregators": 0,
+      "malicious_aggregators": 0,
+      "total_challenges": 0,
+      "successful_challenges": 0,
+      "challenge_success_rate": 0,
+      "malicious_detection_rate": 0
+    }
+  },
+  "comparison": {
+    "challenge_mechanism": {},
+    "malicious_detection": {},
+    "overall_performance": {}
+  }
+}

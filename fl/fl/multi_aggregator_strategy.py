@@ -40,9 +40,6 @@ class MultiAggregatorStrategy(FedAvg):
         num_aggregators: int = 3,
         malicious_aggregator_ids: List[int] = None,
         enable_challenges: bool = True,
-        malicious_strategies: Optional[Dict[int, str]] = None,
-        challenge_threshold: float = 1e-6,
-        challenge_metric: str = "mse",
         **kwargs,
     ):
         """Initialize the MultiAggregatorStrategy.
@@ -51,9 +48,6 @@ class MultiAggregatorStrategy(FedAvg):
             num_aggregators: Number of virtual aggregators to simulate
             malicious_aggregator_ids: List of aggregator IDs (0-indexed) that will produce malicious results
             enable_challenges: Whether to enable the challenge mechanism
-            malicious_strategies: Dict mapping aggregator_id to strategy name (e.g., 'noise', 'scaling', 'zeroing')
-            challenge_threshold: Threshold for challenge validation
-            challenge_metric: Metric for challenge validation ('mse', 'mae', etc.)
             **kwargs: Additional arguments to pass to FedAvg
         """
         super().__init__(**kwargs)
@@ -64,9 +58,6 @@ class MultiAggregatorStrategy(FedAvg):
         self.round = 0
         self.metrics_history = []
         self.challenged_rounds = set()
-        self.malicious_strategies = malicious_strategies or {i: "noise" for i in self.malicious_aggregator_ids}
-        self.challenge_threshold = challenge_threshold
-        self.challenge_metric = challenge_metric
 
         # Validation for malicious aggregator IDs
         for agg_id in self.malicious_aggregator_ids:
@@ -75,9 +66,7 @@ class MultiAggregatorStrategy(FedAvg):
 
         logger.info(f"Initialized MultiAggregatorStrategy with {num_aggregators} aggregators")
         logger.info(f"Malicious aggregators: {self.malicious_aggregator_ids}")
-        logger.info(f"Malicious strategies: {self.malicious_strategies}")
         logger.info(f"Challenge mechanism enabled: {self.enable_challenges}")
-        logger.info(f"Challenge threshold: {self.challenge_threshold}, metric: {self.challenge_metric}")
 
     def aggregate_fit(
         self,
@@ -134,91 +123,57 @@ class MultiAggregatorStrategy(FedAvg):
 
         # If challenges are enabled, determine if this aggregation is challenged
         if self.enable_challenges and is_malicious:
+            # In practice, challenges would come from validators
+            # Here we simulate an automatic challenge for malicious aggregations
             challenged = random.random() < 0.8  # 80% chance of catching malicious aggregation
-            status = "pending"
-            challenge_distance = None
-            challenge_threshold = None
+            
             if challenged:
                 challenge_success = self._validate_challenge(server_round, aggregated_parameters, honest_parameters)
                 self.challenged_rounds.add(server_round)
-                challenge_distance = getattr(self, '_last_challenge_distance', None)
-                challenge_threshold = getattr(self, '_last_challenge_threshold', None)
-                status = "successful" if challenge_success else "rejected"
+                
                 # Track challenge metrics
                 challenge_metrics = {
                     "round": int(server_round),
                     "aggregator_id": int(self.current_aggregator_id),
                     "malicious": bool(is_malicious),
-                    "malicious_strategy": self.malicious_strategies.get(self.current_aggregator_id, "noise"),
                     "challenged": bool(challenged),
-                    "challenge_success": bool(challenge_success),
-                    "challenge_status": status,
-                    "challenge_distance": challenge_distance,
-                    "challenge_threshold": challenge_threshold,
+                    "challenge_success": bool(challenge_success)
                 }
-                # Log parameter differences for challenged rounds
-                if challenge_distance is not None:
-                    challenge_metrics["param_diff"] = float(challenge_distance)
                 self.metrics_history.append(challenge_metrics)
                 logger.info(f"Round {server_round}: Challenge result - {json.dumps(challenge_metrics)}")
+                
+                # If challenge is successful, use honest parameters
                 if challenge_success:
                     logger.info(f"Round {server_round}: Challenge successful! Using honest parameters instead")
                     return honest_parameters, {
                         **metrics,
                         "challenged": True,
-                        "challenge_successful": True,
-                        "challenge_status": status,
-                        "challenge_distance": challenge_distance,
-                        "challenge_threshold": challenge_threshold,
-                        "malicious_strategy": self.malicious_strategies.get(self.current_aggregator_id, "noise"),
+                        "challenge_successful": True
                     }
-                else:
-                    return aggregated_parameters, {
-                        **metrics,
-                        "challenged": True,
-                        "challenge_successful": False,
-                        "challenge_status": status,
-                        "challenge_distance": challenge_distance,
-                        "challenge_threshold": challenge_threshold,
-                        "malicious_strategy": self.malicious_strategies.get(self.current_aggregator_id, "noise"),
-                    }
-            else:
-                # Not challenged
-                challenge_metrics = {
-                    "round": int(server_round),
-                    "aggregator_id": int(self.current_aggregator_id),
-                    "malicious": bool(is_malicious),
-                    "malicious_strategy": self.malicious_strategies.get(self.current_aggregator_id, "noise"),
-                    "challenged": False,
-                    "challenge_success": None,
-                    "challenge_status": status,
-                    "challenge_distance": None,
-                    "challenge_threshold": None,
-                }
-                self.metrics_history.append(challenge_metrics)
+
         return aggregated_parameters, metrics
 
     def _create_malicious_aggregation(self, honest_ndarrays: List[np.ndarray]) -> List[np.ndarray]:
         """Create a malicious aggregation by modifying the honest aggregation.
 
-        Supports multiple strategies: 'noise', 'scaling', 'zeroing'.
+        In a real-world scenario, malicious aggregators would manipulate in various ways.
+        Here, we simply add noise to the parameters to simulate manipulation.
+
+        Args:
+            honest_ndarrays: The honestly aggregated parameters
+
+        Returns:
+            Modified parameters representing malicious behavior (or unchanged if honest)
         """
+        # Only add noise if the current aggregator is malicious
         if hasattr(self, 'current_aggregator_id') and self.current_aggregator_id in self.malicious_aggregator_ids:
-            strategy = self.malicious_strategies.get(self.current_aggregator_id, "noise")
             malicious_ndarrays = [np.copy(arr) for arr in honest_ndarrays]
-            if strategy == "noise":
-                for i in range(len(malicious_ndarrays)):
-                    scale = np.mean(np.abs(malicious_ndarrays[i])) * 0.5
-                    malicious_ndarrays[i] += np.random.normal(0, scale, size=malicious_ndarrays[i].shape)
-            elif strategy == "scaling":
-                for i in range(len(malicious_ndarrays)):
-                    malicious_ndarrays[i] *= 2.0  # Arbitrary scaling
-            elif strategy == "zeroing":
-                for i in range(len(malicious_ndarrays)):
-                    malicious_ndarrays[i].fill(0)
-            # Add more strategies as needed
+            for i in range(len(malicious_ndarrays)):
+                scale = np.mean(np.abs(malicious_ndarrays[i])) * 0.5
+                malicious_ndarrays[i] += np.random.normal(0, scale, size=malicious_ndarrays[i].shape)
             return malicious_ndarrays
         else:
+            # Honest aggregator: return parameters unchanged
             return [np.copy(arr) for arr in honest_ndarrays]
 
     def _store_honest_parameters(self, server_round: int, honest_parameters: Parameters) -> None:
@@ -240,23 +195,36 @@ class MultiAggregatorStrategy(FedAvg):
     ) -> bool:
         """Validate a challenge by comparing challenged parameters with honest ones.
 
-        Supports configurable metric and threshold.
-        Logs the distance and threshold used.
+        In our simplified case, we just check if the "malicious" tag is present.
+        In a real system, this would involve re-computation and cryptographic verification.
+
+        Args:
+            server_round: Current server round
+            challenged_parameters: Parameters that are being challenged
+            honest_parameters: Honestly computed parameters for comparison
+
+        Returns:
+            True if challenge is successful (i.e., aggregation is indeed malicious)
         """
+        # In a real implementation, we would recompute the aggregation and compare
+        # Here we simplify by checking the metrics tag
+        
+        # Convert parameters to ndarrays for comparison
         challenged_ndarrays = parameters_to_ndarrays(challenged_parameters)
         honest_ndarrays = parameters_to_ndarrays(honest_parameters)
-        # Calculate distance
-        if self.challenge_metric == "mse":
-            total_diff = sum(np.mean(np.square(c - h)) for c, h in zip(challenged_ndarrays, honest_ndarrays))
-        elif self.challenge_metric == "mae":
-            total_diff = sum(np.mean(np.abs(c - h)) for c, h in zip(challenged_ndarrays, honest_ndarrays))
-        else:
-            total_diff = sum(np.mean(np.square(c - h)) for c, h in zip(challenged_ndarrays, honest_ndarrays))
-        result = total_diff > self.challenge_threshold
-        logger.info(f"Challenge validation - metric: {self.challenge_metric}, difference: {total_diff}, threshold: {self.challenge_threshold}, result: {result}")
-        # Store for metrics logging
-        self._last_challenge_distance = total_diff
-        self._last_challenge_threshold = self.challenge_threshold
+        
+        # Calculate difference metrics
+        total_diff = 0
+        for c_arr, h_arr in zip(challenged_ndarrays, honest_ndarrays):
+            # Compute mean squared difference
+            diff = np.mean(np.square(c_arr - h_arr))
+            total_diff += diff
+        
+        # If difference exceeds threshold, challenge is successful
+        threshold = 1e-6
+        result = total_diff > threshold
+        
+        logger.info(f"Challenge validation - difference: {total_diff}, threshold: {threshold}, result: {result}")
         return result
 
     def aggregate_evaluate(

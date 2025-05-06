@@ -7,7 +7,10 @@ from typing import Dict, List
 
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
+from flwr.server.client_manager import SimpleClientManager
+
 from .multi_aggregator_strategy import MultiAggregatorStrategy
+from .server import MultiAggregatorResultsSaverServer, save_results_and_research_data
 from fl.task import Net, get_weights
 
 logger = logging.getLogger(__name__)
@@ -49,52 +52,22 @@ def server_fn(context: Context):
         initial_parameters=parameters,
     )
     
+    # Create client manager
+    client_manager = SimpleClientManager()
+    
+    # Create custom server with results saving capabilities
+    server = MultiAggregatorResultsSaverServer(
+        client_manager=client_manager,
+        strategy=strategy,
+        results_saver_fn=save_results_and_research_data,
+        run_config=context.run_config,
+    )
+    
     # Server config
     config = ServerConfig(num_rounds=num_rounds)
     
-    # Save the strategy for later data collection
-    # We'll store it in a global variable that can be accessed after simulation
-    global multi_aggregator_strategy
-    multi_aggregator_strategy = strategy
-    
-    return ServerAppComponents(strategy=strategy, config=config)
-
+    # Return components with custom server
+    return ServerAppComponents(server=server, config=config)
 
 # Create ServerApp
 app = ServerApp(server_fn=server_fn)
-
-# Global variable to store the strategy instance for data collection
-multi_aggregator_strategy = None
-
-
-def save_research_data(output_path: str = "research_data.json") -> None:
-    """Save research data to a file after simulation completes.
-    
-    Args:
-        output_path: Path to save the research data JSON file
-    
-    Returns:
-        None
-    """
-    if multi_aggregator_strategy is None:
-        logger.warning("No research data available. Run simulation first.")
-        return
-    
-    # Get research data from the strategy
-    data = multi_aggregator_strategy.get_research_data()
-    
-    # Save to file
-    os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
-    with open(output_path, "w") as f:
-        json.dump(data, f, indent=2)
-    
-    logger.info(f"Research data saved to {output_path}")
-    
-    # Print summary
-    print("\n=== RESEARCH SUMMARY ===")
-    print(f"Total rounds: {data['total_rounds']}")
-    print(f"Total aggregators: {data['total_aggregators']}")
-    print(f"Malicious aggregators: {data['malicious_aggregators']}")
-    print(f"Challenge success rate: {data['challenge_success_rate']:.2f}")
-    print(f"Malicious detection rate: {data['malicious_detection_rate']:.2f}")
-    print("========================\n")

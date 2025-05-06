@@ -1,0 +1,12 @@
+{
+  "history": {
+    "loss": {},
+    "metrics_fit": {},
+    "metrics_evaluate": {}
+  },
+  "run_config": {
+    "num-server-rounds": 3,
+    "fraction-fit": 0.5,
+    "local-epochs": 1
+  }
+}

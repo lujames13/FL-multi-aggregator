@@ -1,0 +1,14 @@
+# Multi-Aggregator Federated Learning Research Report
+
+## Scenario Summaries
+
+### aggs3_mal_chalon_20250506_164944
+
+- Total rounds: 0
+- Total aggregators: 0
+- Malicious aggregators: 0
+- Total challenges: 0
+- Successful challenges: 0
+- Challenge success rate: 0.00%
+- Malicious detection rate: 0.00%
+
