@@ -7,7 +7,7 @@ from typing import Dict, List
 
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from multi_aggregator_strategy import MultiAggregatorStrategy
+from .multi_aggregator_strategy import MultiAggregatorStrategy
 from fl.task import Net, get_weights
 
 logger = logging.getLogger(__name__)
