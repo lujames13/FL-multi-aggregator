@@ -28,6 +28,7 @@ def server_fn(context: Context):
     challenge_frequency = context.run_config.get("challenge-frequency", 0.25)
     challenge_mode = context.run_config.get("challenge-mode", 'deterministic')
     strategy_type = context.run_config.get("strategy-type", "hybrid")
+    network_delay_factor = context.run_config.get("network-delay-factor", 0.05)
 
     # Determine which aggregators are malicious (if any)
     malicious_aggregator_str = context.run_config.get("malicious-aggregators", "")
@@ -60,6 +61,7 @@ def server_fn(context: Context):
             fraction_evaluate=1.0,
             min_available_clients=2,
             initial_parameters=parameters,
+            network_delay_factor=network_delay_factor,
         )
     else:
         strategy = HybridOptimisticPBFTAggregatorStrategy(
@@ -72,6 +74,7 @@ def server_fn(context: Context):
             fraction_evaluate=1.0,
             min_available_clients=2,
             initial_parameters=parameters,
+            network_delay_factor=network_delay_factor,
         )
     
     # Create client manager
