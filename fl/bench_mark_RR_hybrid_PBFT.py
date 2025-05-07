@@ -7,7 +7,7 @@ for each of RR (no challenge), Hybrid (0.25), PBFT (1.0).
 Plots processing time (s) vs. aggregators for all three methods.
 
 Usage:
-    python bench_mark_RR_hybrid_PBFT.py --rounds 3 --output-dir results_benchmark
+    python bench_mark_RR_hybrid_PBFT.py --rounds 3 --output-dir results
 """
 import os
 import subprocess
@@ -27,10 +27,6 @@ SCENARIOS = [
 def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_frequency, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     malicious_str = ""
-    scenario_name = f"aggs{aggregators}_mal{malicious_str.replace(',', '_')}_chal{'on' if enable_challenges else 'off'}"
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.abspath(os.path.join(output_dir, f"research_data_{scenario_name}_{timestamp}.json"))
-
     run_config = {
         "num-server-rounds": rounds,
         "fraction-fit": 0.5,
@@ -38,7 +34,7 @@ def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_fr
         "num-aggregators": aggregators,
         "malicious-aggregators": malicious_str,
         "enable-challenges": enable_challenges,
-        "output-path": output_file,
+        "output-dir": output_dir,
         "challenge-frequency": challenge_frequency,
         "challenge-mode": "deterministic",
     }
@@ -55,14 +51,11 @@ def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_fr
     ]
     print(f"Running: {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
-    if not os.path.exists(output_file):
-        # fallback: find the latest research_data_*.json
-        files = [f for f in os.listdir(output_dir) if f.startswith("research_data_") and f.endswith(".json")]
-        files = sorted(files, key=lambda x: os.path.getmtime(os.path.join(output_dir, x)), reverse=True)
-        if not files:
-            raise RuntimeError(f"No research_data_*.json found in {output_dir}")
-        return os.path.join(output_dir, files[0])
-    return output_file
+    files = [f for f in os.listdir(output_dir) if f.startswith("research_data_") and f.endswith(".json")]
+    if not files:
+        raise RuntimeError(f"No research_data_*.json found in {output_dir}")
+    files = sorted(files, key=lambda x: os.path.getmtime(os.path.join(output_dir, x)), reverse=True)
+    return os.path.join(output_dir, files[0])
 
 
 def extract_processing_time(json_file):
@@ -75,7 +68,7 @@ def main():
     parser = argparse.ArgumentParser(description="Benchmark RR, Hybrid, PBFT processing time vs. aggregators.")
     parser.add_argument("--clients", type=int, default=40, help="Number of clients (default: 40)")
     parser.add_argument("--rounds", type=int, default=3, help="Number of rounds (default: 3)")
-    parser.add_argument("--output-dir", type=str, default="results_benchmark", help="Directory to save results")
+    parser.add_argument("--output-dir", type=str, default="results", help="Directory to save results")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
