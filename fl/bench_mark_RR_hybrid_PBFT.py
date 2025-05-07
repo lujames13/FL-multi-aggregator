@@ -72,22 +72,18 @@ def main():
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
-
     results = {scenario[0]: [] for scenario in SCENARIOS}
 
     for agg_count in AGGREGATOR_COUNTS:
         for scenario_name, enable_challenges, challenge_freq in SCENARIOS:
             print(f"\n=== {scenario_name} | Aggregators: {agg_count} ===")
-            # Unique subdir for each run to avoid file overwrite
-            run_dir = os.path.join(args.output_dir, f"{scenario_name}_aggs{agg_count}")
-            os.makedirs(run_dir, exist_ok=True)
             json_file = run_simulation(
                 clients=args.clients,
                 rounds=args.rounds,
                 aggregators=agg_count,
                 enable_challenges=enable_challenges,
                 challenge_frequency=challenge_freq,
-                output_dir=run_dir,
+                output_dir=args.output_dir,
             )
             proc_time = extract_processing_time(json_file)
             print(f"Processing time: {proc_time}s")
