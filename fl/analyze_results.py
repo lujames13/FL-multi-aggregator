@@ -6,6 +6,10 @@ Outputs:
 - challenge_effectiveness.png: Bar plot of challenge/detection rates per scenario
 - aggregator_performance.png: Scatter plot of aggregator activity and challenges
 - challenge_timeline.png: Timeline of challenge outcomes per scenario
+- aggregator_exclusion.png: Analysis of aggregator exclusion rates
+- rollback_overhead.png: Analysis of training efficiency and rollback overhead
+- attack_detection.png: Performance of attack detection mechanism
+- challenge_delay_correlation.png: Correlation between challenge success and detection delay
 - comparative_analysis.json: Summary of key metrics and scenario comparison
 - research_report.txt: Human-readable report for research papers
 
@@ -292,6 +296,306 @@ def generate_challenge_timeline_plot(
     logger.info(f"Generated challenge timeline plot: {output_path}")
 
 
+def generate_aggregator_exclusion_plot(
+    all_data: Dict,
+    output_dir: str,
+    filename: str = "aggregator_exclusion.png"
+):
+    """Generate a plot showing aggregator exclusion rates across scenarios.
+    
+    Args:
+        all_data: Dictionary mapping scenario names to result data
+        output_dir: Directory to save the plot
+        filename: Filename for the plot
+    """
+    plt.figure(figsize=(10, 6))
+    
+    # Prepare data
+    scenarios = []
+    exclusion_rates = []
+    effective_aggregators = []
+    
+    for scenario, data in all_data.items():
+        if "aggregator_exclusion_percentage" in data:
+            scenarios.append(scenario)
+            exclusion_rates.append(data["aggregator_exclusion_percentage"])
+            effective_aggregators.append(data.get("effective_aggregators", 0))
+    
+    if not scenarios:
+        logger.warning("No aggregator exclusion data found in results")
+        return
+    
+    # Primary plot: Exclusion rates
+    ax1 = plt.gca()
+    bars = ax1.bar(scenarios, exclusion_rates, color='red', alpha=0.7)
+    ax1.set_ylabel('Exclusion Rate (%)', color='red')
+    ax1.set_ylim(0, 100)  # Percentage scale
+    
+    # Add value labels above the bars
+    for bar in bars:
+        height = bar.get_height()
+        ax1.annotate(f'{height:.1f}%',
+                    xy=(bar.get_x() + bar.get_width() / 2, height),
+                    xytext=(0, 3),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha='center', va='bottom')
+    
+    # Secondary plot: Effective aggregators
+    ax2 = ax1.twinx()
+    ax2.plot(scenarios, effective_aggregators, 'bo-', linewidth=2, markersize=8)
+    ax2.set_ylabel('Effective Aggregators', color='blue')
+    ax2.set_ylim(0, max(effective_aggregators) * 1.5 if effective_aggregators else 10)
+    
+    # Add title and adjust layout
+    plt.title('Aggregator Exclusion Analysis')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    
+    # Save the plot
+    output_path = os.path.join(output_dir, filename)
+    plt.savefig(output_path)
+    logger.info(f"Generated aggregator exclusion plot: {output_path}")
+
+
+def generate_rollback_overhead_plot(
+    all_data: Dict,
+    output_dir: str,
+    filename: str = "rollback_overhead.png"
+):
+    """Generate a plot showing rollback overhead and effective training.
+    
+    Args:
+        all_data: Dictionary mapping scenario names to result data
+        output_dir: Directory to save the plot
+        filename: Filename for the plot
+    """
+    plt.figure(figsize=(12, 7))
+    
+    # Prepare data
+    scenarios = []
+    total_rounds = []
+    effective_rounds = []
+    rollback_overhead = []
+    
+    for scenario, data in all_data.items():
+        if "total_rounds" in data and "effective_training_rounds" in data:
+            scenarios.append(scenario)
+            total_rounds.append(data["total_rounds"])
+            effective_rounds.append(data["effective_training_rounds"])
+            rollback_overhead.append(data.get("rollback_overhead_percentage", 0))
+    
+    if not scenarios:
+        logger.warning("No rollback data found in results")
+        return
+    
+    # Set up bar width and positions
+    bar_width = 0.35
+    x = np.arange(len(scenarios))
+    
+    # Create stacked bars for total and effective rounds
+    plt.bar(x, total_rounds, bar_width, label='Total Rounds', color='skyblue')
+    plt.bar(x, effective_rounds, bar_width, label='Effective Training Rounds', color='darkblue')
+    
+    # Add a line for rollback overhead percentage
+    ax1 = plt.gca()
+    ax2 = ax1.twinx()
+    ax2.plot(x, rollback_overhead, 'ro-', linewidth=2, markersize=8, label='Rollback Overhead (%)')
+    ax2.set_ylabel('Rollback Overhead (%)', color='red')
+    ax2.set_ylim(0, max(rollback_overhead) * 1.2 if rollback_overhead else 100)
+    
+    # Add data annotations
+    for i, (tr, er, ro) in enumerate(zip(total_rounds, effective_rounds, rollback_overhead)):
+        ax1.annotate(f'{tr}',
+                   xy=(i, tr),
+                   xytext=(0, 5),
+                   textcoords="offset points",
+                   ha='center', va='bottom')
+        
+        ax1.annotate(f'{er}',
+                   xy=(i, er / 2),  # Middle of the blue bar
+                   xytext=(0, 0),
+                   textcoords="offset points",
+                   ha='center', va='center',
+                   color='white')
+        
+        ax2.annotate(f'{ro:.1f}%',
+                   xy=(i, ro),
+                   xytext=(0, -15),
+                   textcoords="offset points",
+                   ha='center', va='top',
+                   color='red')
+    
+    # Add labels and legend
+    ax1.set_xlabel('Scenario')
+    ax1.set_ylabel('Number of Rounds')
+    plt.title('Training Efficiency and Rollback Overhead Analysis')
+    plt.xticks(x, scenarios, rotation=45)
+    
+    # Combine legends from both axes
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    output_path = os.path.join(output_dir, filename)
+    plt.savefig(output_path)
+    logger.info(f"Generated rollback overhead plot: {output_path}")
+
+
+def generate_attack_detection_plot(
+    all_data: Dict,
+    output_dir: str,
+    filename: str = "attack_detection.png"
+):
+    """Generate a plot analyzing attack detection performance.
+    
+    Args:
+        all_data: Dictionary mapping scenario names to result data
+        output_dir: Directory to save the plot
+        filename: Filename for the plot
+    """
+    plt.figure(figsize=(12, 7))
+    
+    # Prepare data
+    scenarios = []
+    total_attacks = []
+    detected_attacks = []
+    detection_delays = []
+    
+    for scenario, data in all_data.items():
+        if "total_rounds_with_attack" in data or "detected_attacks" in data:
+            scenarios.append(scenario)
+            total_attacks.append(data.get("total_rounds_with_attack", 0))
+            detected_attacks.append(len(data.get("detected_attacks", [])))
+            detection_delays.append(data.get("detection_delay", 0))
+    
+    if not scenarios:
+        logger.warning("No attack detection data found in results")
+        return
+    
+    # Calculate detection rates
+    detection_rates = [detected / total * 100 if total > 0 else 0 
+                       for detected, total in zip(detected_attacks, total_attacks)]
+    
+    # Primary plot: Attacks and detection
+    x = np.arange(len(scenarios))
+    bar_width = 0.35
+    
+    ax1 = plt.subplot(211)
+    rects1 = ax1.bar(x - bar_width/2, total_attacks, bar_width, label='Total Attacks', color='red', alpha=0.7)
+    rects2 = ax1.bar(x + bar_width/2, detected_attacks, bar_width, label='Detected Attacks', color='green', alpha=0.7)
+    
+    # Add detection rate as text
+    for i, rate in enumerate(detection_rates):
+        ax1.annotate(f'{rate:.1f}%',
+                    xy=(x[i], max(total_attacks[i], detected_attacks[i]) + 0.5),
+                    ha='center', va='bottom')
+    
+    ax1.set_ylabel('Count')
+    ax1.set_title('Attack Detection Performance')
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(scenarios)
+    ax1.legend()
+    
+    # Secondary plot: Detection delay
+    ax2 = plt.subplot(212)
+    ax2.bar(scenarios, detection_delays, color='orange')
+    ax2.set_ylabel('Rounds')
+    ax2.set_title('Average Detection Delay')
+    
+    # Add value labels
+    for i, delay in enumerate(detection_delays):
+        ax2.annotate(f'{delay:.1f}',
+                    xy=(i, delay),
+                    xytext=(0, 3),
+                    textcoords="offset points",
+                    ha='center', va='bottom')
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    output_path = os.path.join(output_dir, filename)
+    plt.savefig(output_path)
+    logger.info(f"Generated attack detection plot: {output_path}")
+
+
+def generate_challenge_delay_correlation_plot(
+    all_data: Dict,
+    output_dir: str,
+    filename: str = "challenge_delay_correlation.png"
+):
+    """Generate a scatter plot showing correlation between challenge success and detection delay.
+    
+    Args:
+        all_data: Dictionary mapping scenario names to result data
+        output_dir: Directory to save the plot
+        filename: Filename for the plot
+    """
+    # Extract data points
+    points = []
+    labels = []
+    
+    for scenario, data in all_data.items():
+        if "challenge_success_rate" in data and "detection_delay" in data:
+            success_rate = data["challenge_success_rate"] * 100  # Convert to percentage
+            delay = data["detection_delay"]
+            points.append((success_rate, delay))
+            labels.append(scenario)
+    
+    if not points:
+        logger.warning("No challenge-delay correlation data found in results")
+        return
+    
+    # Create the scatter plot
+    plt.figure(figsize=(10, 6))
+    
+    # Unpack the points
+    success_rates, delays = zip(*points)
+    
+    # Create scatter plot
+    plt.scatter(success_rates, delays, s=100, c=range(len(points)), cmap='viridis')
+    
+    # Add labels to points
+    for i, (sr, d, label) in enumerate(zip(success_rates, delays, labels)):
+        plt.annotate(
+            label,
+            (sr, d),
+            xytext=(5, 5),
+            textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8)
+        )
+    
+    # Add best fit line if we have enough points
+    if len(points) > 2:
+        z = np.polyfit(success_rates, delays, 1)
+        p = np.poly1d(z)
+        plt.plot(
+            np.linspace(min(success_rates), max(success_rates), 100),
+            p(np.linspace(min(success_rates), max(success_rates), 100)),
+            "r--", alpha=0.8
+        )
+        
+        # Calculate correlation coefficient
+        corr = np.corrcoef(success_rates, delays)[0, 1]
+        plt.title(f'Challenge Success Rate vs. Detection Delay (r = {corr:.2f})')
+    else:
+        plt.title('Challenge Success Rate vs. Detection Delay')
+    
+    # Add labels and grid
+    plt.xlabel('Challenge Success Rate (%)')
+    plt.ylabel('Detection Delay (rounds)')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    output_path = os.path.join(output_dir, filename)
+    plt.savefig(output_path)
+    logger.info(f"Generated challenge-delay correlation plot: {output_path}")
+
+
 def generate_comparative_analysis(all_data: Dict, output_dir: str):
     """Generate a comparative analysis of all scenarios.
     
@@ -316,13 +620,23 @@ def generate_comparative_analysis(all_data: Dict, output_dir: str):
     # Extract key metrics for each scenario
     for scenario, data in all_data.items():
         summary["scenarios"][scenario] = {
+            # Original metrics
             "total_rounds": data.get("total_rounds", 0),
             "total_aggregators": data.get("total_aggregators", 0),
             "malicious_aggregators": data.get("malicious_aggregators", 0),
             "total_challenges": data.get("total_challenges", 0),
             "successful_challenges": data.get("successful_challenges", 0),
             "challenge_success_rate": data.get("challenge_success_rate", 0),
-            "malicious_detection_rate": data.get("malicious_detection_rate", 0)
+            "malicious_detection_rate": data.get("malicious_detection_rate", 0),
+            
+            # New metrics
+            "effective_aggregators": data.get("effective_aggregators", 0),
+            "aggregator_exclusion_percentage": data.get("aggregator_exclusion_percentage", 0),
+            "effective_training_rounds": data.get("effective_training_rounds", 0),
+            "rollback_overhead_percentage": data.get("rollback_overhead_percentage", 0),
+            "total_rounds_with_attack": data.get("total_rounds_with_attack", 0),
+            "detected_attacks": len(data.get("detected_attacks", [])),
+            "detection_delay": data.get("detection_delay", 0)
         }
     
     # Compute comparative metrics
@@ -382,6 +696,22 @@ def generate_comparative_analysis(all_data: Dict, output_dir: str):
             f.write(f"- Challenge success rate: {metrics['challenge_success_rate']:.2%}\n")
             f.write(f"- Malicious detection rate: {metrics['malicious_detection_rate']:.2%}\n\n")
         
+        f.write("## Training Efficiency Analysis\n\n")
+        for scenario, metrics in summary["scenarios"].items():
+            effective_training_pct = (metrics['effective_training_rounds'] / metrics['total_rounds'] * 100) if metrics['total_rounds'] > 0 else 0
+            f.write(f"### {scenario}\n\n")
+            f.write(f"- Effective training rounds: {metrics['effective_training_rounds']} of {metrics['total_rounds']} ({effective_training_pct:.1f}%)\n")
+            f.write(f"- Rollback overhead: {metrics['rollback_overhead_percentage']:.2f}%\n")
+            f.write(f"- Effective aggregators: {metrics['effective_aggregators']} of {metrics['total_aggregators']}\n")
+            f.write(f"- Aggregator exclusion rate: {metrics['aggregator_exclusion_percentage']:.2f}%\n\n")
+
+        f.write("## Attack Detection Analysis\n\n")
+        for scenario, metrics in summary["scenarios"].items():
+            detection_rate = (metrics['detected_attacks'] / metrics['total_rounds_with_attack'] * 100) if metrics['total_rounds_with_attack'] > 0 else 0
+            f.write(f"### {scenario}\n\n")
+            f.write(f"- Attacks detected: {metrics['detected_attacks']} of {metrics['total_rounds_with_attack']} ({detection_rate:.1f}%)\n")
+            f.write(f"- Average detection delay: {metrics['detection_delay']:.1f} rounds\n\n")
+        
         if len(all_data) > 1:
             f.write("## Comparative Analysis\n\n")
             
@@ -439,7 +769,26 @@ def generate_comparative_analysis(all_data: Dict, output_dir: str):
                 else:
                     f.write("2. The approach shows limited effectiveness in detecting malicious aggregators, with detection rates below 40% in all scenarios.\n\n")
             
-            f.write("3. Further research is recommended to explore different challenge mechanisms and improve detection rates in more complex scenarios.\n")
+            # Add analysis of the training overhead from rollbacks
+            avg_rollback_overhead = sum(d.get("rollback_overhead_percentage", 0) for d in all_data.values()) / len(all_data)
+            if avg_rollback_overhead < 10:
+                f.write("3. The training overhead from rollbacks is minimal (<10%), suggesting that the challenge mechanism is efficient.\n\n")
+            elif avg_rollback_overhead < 30:
+                f.write("3. The training overhead from rollbacks is moderate (10-30%), suggesting a reasonable tradeoff between security and efficiency.\n\n")
+            else:
+                f.write("3. The training overhead from rollbacks is significant (>30%), suggesting that optimizations to the challenge mechanism may be needed.\n\n")
+                
+            # Add analysis of detection delays
+            avg_detection_delay = sum(d.get("detection_delay", 0) for d in all_data.values()) / len(all_data)
+            if avg_detection_delay < 2:
+                f.write("4. Malicious behavior is detected quickly (< 2 rounds on average), enabling rapid response to attacks.\n\n")
+            elif avg_detection_delay < 5:
+                f.write("4. Malicious behavior detection has moderate delay (2-5 rounds on average), which may be acceptable for most applications.\n\n")
+            else:
+                f.write("4. Malicious behavior detection has significant delay (> 5 rounds on average), which may allow attackers to cause substantial damage before detection.\n\n")
+            
+            # Final recommendation
+            f.write("5. Further research is recommended to explore different challenge mechanisms and improve detection rates in more complex scenarios, with particular focus on minimizing detection delays and training overhead.\n")
     
     logger.info(f"Generated research report: {report_path}")
     
@@ -463,10 +812,16 @@ def generate_all_visualizations(results_dir: str, output_dir: str = None):
         logger.error(f"No result data found in {results_dir}")
         return
     
-    # Generate visualizations
+    # Generate original visualizations
     generate_challenge_effectiveness_plot(all_data, output_dir)
     generate_aggregator_performance_plot(all_data, output_dir)
     generate_challenge_timeline_plot(all_data, output_dir)
+    
+    # Generate new visualizations
+    generate_aggregator_exclusion_plot(all_data, output_dir)
+    generate_rollback_overhead_plot(all_data, output_dir)
+    generate_attack_detection_plot(all_data, output_dir)
+    generate_challenge_delay_correlation_plot(all_data, output_dir)
     
     # Generate comparative analysis
     generate_comparative_analysis(all_data, output_dir)
@@ -479,7 +834,6 @@ def main(results_dir: str, output_dir: str = None):
     generate_all_visualizations(results_dir, output_dir)
 
 # Alias for test compatibility
-
 generate_plots = generate_all_visualizations
 
 if __name__ == "__main__":

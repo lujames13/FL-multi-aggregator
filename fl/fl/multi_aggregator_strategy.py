@@ -279,36 +279,3 @@ class MultiAggregatorStrategy(FedAvg):
         logger.info(f"Challenge success rate: {challenge_success_rate:.2f}")
         logger.info(f"Malicious detection rate: {malicious_detection_rate:.2f}")
         logger.info("--------------------------------------------\n")
-
-    def get_research_data(self) -> Dict:
-        """Get research data for paper generation.
-
-        Returns:
-            Dictionary with research metrics
-        """
-        if not self.metrics_history:
-            return {}
-        
-        # Calculate overall metrics
-        total_rounds = self.round
-        malicious_rounds = [m for m in self.metrics_history if m["malicious"]]
-        total_malicious = len(malicious_rounds)
-        total_challenges = len([m for m in self.metrics_history if m["challenged"]])
-        successful_challenges = len([m for m in self.metrics_history if m.get("challenge_success", False)])
-        
-        # Compute rates
-        challenge_success_rate = successful_challenges / total_challenges if total_challenges > 0 else 0
-        malicious_detection_rate = successful_challenges / total_malicious if total_malicious > 0 else 0
-        
-        # Return data for research
-        return {
-            "total_rounds": total_rounds,
-            "total_aggregators": self.num_aggregators,
-            "malicious_aggregators": len(self.malicious_aggregator_ids),
-            "total_malicious_rounds": total_malicious,
-            "total_challenges": total_challenges,
-            "successful_challenges": successful_challenges,
-            "challenge_success_rate": challenge_success_rate,
-            "malicious_detection_rate": malicious_detection_rate,
-            "detailed_history": self.metrics_history
-        }

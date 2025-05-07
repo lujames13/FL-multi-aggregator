@@ -10,6 +10,7 @@ from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.server.client_manager import SimpleClientManager
 
 from .multi_aggregator_strategy import MultiAggregatorStrategy
+from .multi_aggregator_strategy_v2 import MultiAggregatorStrategy_v2
 from .server import MultiAggregatorResultsSaverServer, save_results_and_research_data
 from fl.task import Net, get_weights
 
@@ -42,7 +43,7 @@ def server_fn(context: Context):
     logger.info(f"Running for {num_rounds} rounds with fraction_fit={fraction_fit}")
     
     # Define strategy
-    strategy = MultiAggregatorStrategy(
+    strategy = MultiAggregatorStrategy_v2(
         num_aggregators=num_aggregators,
         malicious_aggregator_ids=malicious_aggregator_ids,
         enable_challenges=enable_challenges,

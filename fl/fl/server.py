@@ -64,14 +64,55 @@ def save_research_data(
         Optional explicit file path. If not provided, it will be generated
         from run_config or default location.
     """
-    # Get research data from strategy if it's a MultiAggregatorStrategy
+    # Collect research data from strategy attributes
     research_data = {}
-    if hasattr(strategy, 'get_research_data'):
-        research_data = strategy.get_research_data()
-        log(INFO, f"Retrieved research data from strategy: {len(research_data)} metrics")
-    else:
-        log(INFO, "Strategy does not provide research data")
-    
+
+    # Collect metrics history if available
+    if hasattr(strategy, 'metrics_history'):
+        research_data["metrics_history"] = getattr(strategy, "metrics_history", [])
+    if hasattr(strategy, 'challenged_rounds'):
+        research_data["challenged_rounds"] = list(getattr(strategy, "challenged_rounds", set()))
+    if hasattr(strategy, 'excluded_aggregators'):
+        research_data["excluded_aggregators"] = list(getattr(strategy, "excluded_aggregators", set()))
+    if hasattr(strategy, 'detected_attacks'):
+        research_data["detected_attacks"] = list(getattr(strategy, "detected_attacks", set()))
+    if hasattr(strategy, 'original_rounds_map'):
+        research_data["original_rounds_map"] = {str(k): v for k, v in getattr(strategy, "original_rounds_map", {}).items()}
+    if hasattr(strategy, 'num_aggregators'):
+        research_data["num_aggregators"] = getattr(strategy, "num_aggregators", None)
+    if hasattr(strategy, 'malicious_aggregator_ids'):
+        research_data["malicious_aggregator_ids"] = list(getattr(strategy, "malicious_aggregator_ids", []))
+    if hasattr(strategy, 'total_rollbacks'):
+        research_data["total_rollbacks"] = getattr(strategy, "total_rollbacks", 0)
+    if hasattr(strategy, 'total_rounds_with_attack'):
+        research_data["total_rounds_with_attack"] = getattr(strategy, "total_rounds_with_attack", 0)
+    if hasattr(strategy, 'detection_delay'):
+        research_data["detection_delay"] = getattr(strategy, "detection_delay", 0)
+    if hasattr(strategy, 'round'):
+        research_data["total_rounds"] = getattr(strategy, "round", 0)
+
+    # Derived metrics
+    num_aggregators = research_data.get("num_aggregators", 0)
+    excluded_aggregators = research_data.get("excluded_aggregators", [])
+    total_rollbacks = research_data.get("total_rollbacks", 0)
+    detection_delay = research_data.get("detection_delay", 0)
+    total_rounds = research_data.get("total_rounds", 0)
+    research_data["effective_aggregators"] = num_aggregators - len(excluded_aggregators)
+    research_data["aggregator_exclusion_percentage"] = (len(excluded_aggregators) / num_aggregators * 100) if num_aggregators > 0 else 0
+    research_data["effective_training_rounds"] = total_rounds - total_rollbacks * detection_delay
+    research_data["rollback_overhead_percentage"] = (total_rollbacks * detection_delay / total_rounds * 100) if total_rounds > 0 else 0
+
+    # Add history metrics
+    if history and history.metrics_distributed:
+        research_data["history"] = {
+            "loss": history.metrics_distributed.get("loss", {}),
+            "metrics_fit": history.metrics_distributed.get("metrics_fit", {}),
+            "metrics_evaluate": history.metrics_distributed.get("metrics_evaluate", {}),
+        }
+
+    # Add run configuration
+    research_data["run_config"] = run_config
+
     # Determine output path
     if file_path is None:
         # Use output-path from run_config if available
@@ -83,30 +124,17 @@ def save_research_data(
             num_aggregators = run_config.get("num-aggregators", 3)
             malicious_str = run_config.get("malicious-aggregators", "")
             enable_challenges = run_config.get("enable-challenges", True)
-            
             scenario_name = f"aggs{num_aggregators}_mal{malicious_str.replace(',', '_')}_chal{'on' if enable_challenges else 'off'}"
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
             file_path = os.path.join(output_dir, f"research_data_{scenario_name}_{timestamp}.json")
-    
+
     # Ensure directory exists
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    
-    # Add history metrics to research data
-    if history and history.metrics_distributed:
-        research_data["history"] = {
-            "loss": history.metrics_distributed.get("loss", {}),
-            "metrics_fit": history.metrics_distributed.get("metrics_fit", {}),
-            "metrics_evaluate": history.metrics_distributed.get("metrics_evaluate", {}),
-        }
-    
-    # Add run configuration
-    research_data["run_config"] = run_config
-    
+
     # Save to file
     with open(file_path, "w") as f:
         json.dump(research_data, f, indent=2)
-    
+
     log(INFO, f"Research data saved to {file_path}")
     return file_path
 
