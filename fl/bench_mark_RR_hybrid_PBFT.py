@@ -29,7 +29,7 @@ def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_fr
     malicious_str = ""
     scenario_name = f"aggs{aggregators}_mal{malicious_str.replace(',', '_')}_chal{'on' if enable_challenges else 'off'}"
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.join(output_dir, f"research_data_{scenario_name}_{timestamp}.json")
+    output_file = os.path.abspath(os.path.join(output_dir, f"research_data_{scenario_name}_{timestamp}.json"))
 
     run_config = {
         "num-server-rounds": rounds,
