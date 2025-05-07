@@ -39,7 +39,7 @@ class MultiAggregatorResultsSaverServer(Server):
         
         if self.results_saver_fn:
             log(INFO, "Results saver function provided. Executing")
-            self.results_saver_fn(history, self.strategy, self.run_config)
+            self.results_saver_fn(history, self.strategy, self.run_config, elapsed_time=elapsed)
         
         return history, elapsed
 
@@ -49,6 +49,7 @@ def save_research_data(
     strategy,
     run_config: Dict,
     file_path: Optional[Union[str, Path]] = None,
+    elapsed_time: float = None,
 ):
     """Save research data to JSON file, including all relevant metrics and curves."""
     research_data = {}
@@ -131,6 +132,10 @@ def save_research_data(
     # Add run configuration
     research_data["run_config"] = run_config
 
+    # Add total elapsed time if provided
+    if elapsed_time is not None:
+        research_data["total_elapsed_time_sec"] = elapsed_time
+
     # Determine output path (as before)
     if file_path is None:
         if "output-path" in run_config:
@@ -192,10 +197,10 @@ def save_history_as_pickle(
     return path
 
 
-def save_results_and_research_data(history, strategy, run_config):
+def save_results_and_research_data(history, strategy, run_config, elapsed_time=None):
     """Save both history and research data."""
     # Save research data as JSON
-    json_path = save_research_data(history, strategy, run_config)
+    json_path = save_research_data(history, strategy, run_config, elapsed_time=elapsed_time)
     
     # Optionally save full history as pickle (useful for detailed analysis)
     output_dir = run_config.get("output-dir", "results")

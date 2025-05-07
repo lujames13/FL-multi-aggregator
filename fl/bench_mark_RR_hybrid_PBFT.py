@@ -61,7 +61,7 @@ def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_fr
 def extract_processing_time(json_file):
     with open(json_file, "r") as f:
         data = json.load(f)
-    return data.get("avg_processing_time_fit", None)
+    return data.get("total_elapsed_time_sec", None)
 
 
 def main():
@@ -95,7 +95,7 @@ def main():
     for scenario_name in results:
         plt.plot(AGGREGATOR_COUNTS, results[scenario_name], marker='o', label=scenario_name)
     plt.xlabel("Number of Aggregators")
-    plt.ylabel("Processing Time (s)")
+    plt.ylabel("Total Elapsed Time (s)")
     plt.title("Processing Time vs. Number of Aggregators (clients=40)")
     plt.legend()
     plt.grid(True, linestyle='--', alpha=0.7)
