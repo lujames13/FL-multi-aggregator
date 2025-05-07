@@ -24,7 +24,7 @@ SCENARIOS = [
 ]
 
 
-def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_frequency, output_dir):
+def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_frequency, output_dir, network_delay_factor):
     os.makedirs(output_dir, exist_ok=True)
     malicious_str = ""
     run_config = {
@@ -37,6 +37,7 @@ def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_fr
         "output-dir": output_dir,
         "challenge-frequency": challenge_frequency,
         "challenge-mode": "deterministic",
+        "network-delay-factor": network_delay_factor,
     }
     federation_config = {
         "num-supernodes": clients
@@ -69,6 +70,7 @@ def main():
     parser.add_argument("--clients", type=int, default=40, help="Number of clients (default: 40)")
     parser.add_argument("--rounds", type=int, default=3, help="Number of rounds (default: 3)")
     parser.add_argument("--output-dir", type=str, default="results", help="Directory to save results")
+    parser.add_argument("--network-delay-factor", type=float, default=0.05, help="Network delay factor (default: 0.05)")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -84,6 +86,7 @@ def main():
                 enable_challenges=enable_challenges,
                 challenge_frequency=challenge_freq,
                 output_dir=args.output_dir,
+                network_delay_factor=args.network_delay_factor,
             )
             proc_time = extract_processing_time(json_file)
             print(f"Processing time: {proc_time}s")
