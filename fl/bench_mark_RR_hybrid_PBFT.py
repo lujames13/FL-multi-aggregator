@@ -24,7 +24,7 @@ SCENARIOS = [
 ]
 
 
-def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_frequency, output_dir, network_delay_factor):
+def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_frequency, output_dir, network_delay_factor, scenario_name):
     os.makedirs(output_dir, exist_ok=True)
     malicious_str = ""
     run_config = {
@@ -38,6 +38,7 @@ def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_fr
         "challenge-frequency": challenge_frequency,
         "challenge-mode": "deterministic",
         "network-delay-factor": network_delay_factor,
+        "scenario": scenario_name,
     }
     federation_config = {
         "num-supernodes": clients
@@ -87,6 +88,7 @@ def main():
                 challenge_frequency=challenge_freq,
                 output_dir=args.output_dir,
                 network_delay_factor=args.network_delay_factor,
+                scenario_name=scenario_name,
             )
             proc_time = extract_processing_time(json_file)
             print(f"Processing time: {proc_time}s")

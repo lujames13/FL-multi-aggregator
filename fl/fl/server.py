@@ -132,6 +132,10 @@ def save_research_data(
     # Add run configuration
     research_data["run_config"] = run_config
 
+    # 新增：儲存 scenario 參數
+    if "scenario" in run_config:
+        research_data["scenario"] = run_config["scenario"]
+
     # Add total elapsed time if provided
     if elapsed_time is not None:
         research_data["total_elapsed_time_sec"] = elapsed_time
