@@ -3,12 +3,14 @@ import os
 import pytest
 import numpy as np
 import random
+import time
 from unittest.mock import patch
 
 # Add the fl/fl directory to sys.path for direct import
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../fl/fl')))
 
 from multi_aggregator_strategy import MultiAggregatorStrategy
+from hybrid_strategy import HybridOptimisticPBFTAggregatorStrategy
 
 
 def test_round_robin_aggregator_selection():
@@ -81,4 +83,47 @@ def test_challenge_detection_triggers_on_malicious_aggregation():
     # The round should be in challenged_rounds
     assert server_round in strategy.challenged_rounds, "Challenged round not recorded"
     # There should be a challenge metric in metrics_history
-    assert any(m['round'] == server_round and m['challenged'] for m in strategy.metrics_history), "Challenge metrics not recorded" 
+    assert any(m['round'] == server_round and m['challenged'] for m in strategy.metrics_history), "Challenge metrics not recorded"
+
+
+def dummy_results():
+    class DummyClient: pass
+    class DummyFitRes: pass
+    return [(DummyClient(), DummyFitRes()), (DummyClient(), DummyFitRes())], []
+
+def test_rr_mode_no_challenge():
+    strategy = HybridOptimisticPBFTAggregatorStrategy(
+        num_aggregators=2, challenge_frequency=0.0, challenge_mode='deterministic'
+    )
+    for r in range(1, 9):
+        results, failures = dummy_results()
+        _, metrics = strategy.aggregate_fit(r, results, failures)
+        assert metrics["challenge_simulated_this_round"] is False
+
+def test_pbft_mode_all_challenged():
+    strategy = HybridOptimisticPBFTAggregatorStrategy(
+        num_aggregators=2, challenge_frequency=1.0, challenge_mode='deterministic'
+    )
+    for r in range(1, 5):
+        results, failures = dummy_results()
+        _, metrics = strategy.aggregate_fit(r, results, failures)
+        assert metrics["challenge_simulated_this_round"] is True
+
+def test_hybrid_mode_deterministic():
+    strategy = HybridOptimisticPBFTAggregatorStrategy(
+        num_aggregators=2, challenge_frequency=0.25, challenge_mode='deterministic'
+    )
+    for r in range(1, 9):
+        results, failures = dummy_results()
+        _, metrics = strategy.aggregate_fit(r, results, failures)
+        expected = (r % 4 == 0)
+        assert metrics["challenge_simulated_this_round"] == expected
+
+def test_processing_time_fit_positive():
+    strategy = HybridOptimisticPBFTAggregatorStrategy(
+        num_aggregators=2, challenge_frequency=0.25, challenge_mode='deterministic'
+    )
+    results, failures = dummy_results()
+    _, metrics = strategy.aggregate_fit(1, results, failures)
+    assert "processing_time_fit" in metrics
+    assert metrics["processing_time_fit"] > 0 

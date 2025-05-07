@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""
+Benchmark RR, Hybrid, PBFT processing time vs. number of aggregators.
+
+Runs simulations with clients=40 and aggregators in [5, 10, 15, 20, 25],
+for each of RR (no challenge), Hybrid (0.25), PBFT (1.0).
+Plots processing time (s) vs. aggregators for all three methods.
+
+Usage:
+    python bench_mark_RR_hybrid_PBFT.py --rounds 3 --output-dir results_benchmark
+"""
+import os
+import subprocess
+import json
+import time
+import argparse
+import matplotlib.pyplot as plt
+
+AGGREGATOR_COUNTS = [5, 10, 15, 20, 25]
+SCENARIOS = [
+    ("RR", False, 0.0),
+    ("Hybrid", True, 0.25),
+    ("PBFT", True, 1.0),
+]
+
+
+def run_simulation(clients, rounds, aggregators, enable_challenges, challenge_frequency, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+    malicious_str = ""
+    scenario_name = f"aggs{aggregators}_mal{malicious_str.replace(',', '_')}_chal{'on' if enable_challenges else 'off'}"
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(output_dir, f"research_data_{scenario_name}_{timestamp}.json")
+
+    run_config = {
+        "num-server-rounds": rounds,
+        "fraction-fit": 0.5,
+        "local-epochs": 1,
+        "num-aggregators": aggregators,
+        "malicious-aggregators": malicious_str,
+        "enable-challenges": enable_challenges,
+        "output-path": output_file,
+        "challenge-frequency": challenge_frequency,
+        "challenge-mode": "deterministic",
+    }
+    federation_config = {
+        "num-supernodes": clients
+    }
+    run_config_json = json.dumps(run_config)
+    federation_config_json = json.dumps(federation_config)
+
+    cmd = [
+        "flwr", "run",
+        "--run-config", run_config_json,
+        "--federation-config", federation_config_json
+    ]
+    print(f"Running: {' '.join(cmd)}")
+    subprocess.run(cmd, check=True)
+    if not os.path.exists(output_file):
+        # fallback: find the latest research_data_*.json
+        files = [f for f in os.listdir(output_dir) if f.startswith("research_data_") and f.endswith(".json")]
+        files = sorted(files, key=lambda x: os.path.getmtime(os.path.join(output_dir, x)), reverse=True)
+        if not files:
+            raise RuntimeError(f"No research_data_*.json found in {output_dir}")
+        return os.path.join(output_dir, files[0])
+    return output_file
+
+
+def extract_processing_time(json_file):
+    with open(json_file, "r") as f:
+        data = json.load(f)
+    return data.get("avg_processing_time_fit", None)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Benchmark RR, Hybrid, PBFT processing time vs. aggregators.")
+    parser.add_argument("--clients", type=int, default=40, help="Number of clients (default: 40)")
+    parser.add_argument("--rounds", type=int, default=3, help="Number of rounds (default: 3)")
+    parser.add_argument("--output-dir", type=str, default="results_benchmark", help="Directory to save results")
+    args = parser.parse_args()
+
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    results = {scenario[0]: [] for scenario in SCENARIOS}
+
+    for agg_count in AGGREGATOR_COUNTS:
+        for scenario_name, enable_challenges, challenge_freq in SCENARIOS:
+            print(f"\n=== {scenario_name} | Aggregators: {agg_count} ===")
+            # Unique subdir for each run to avoid file overwrite
+            run_dir = os.path.join(args.output_dir, f"{scenario_name}_aggs{agg_count}")
+            os.makedirs(run_dir, exist_ok=True)
+            json_file = run_simulation(
+                clients=args.clients,
+                rounds=args.rounds,
+                aggregators=agg_count,
+                enable_challenges=enable_challenges,
+                challenge_frequency=challenge_freq,
+                output_dir=run_dir,
+            )
+            proc_time = extract_processing_time(json_file)
+            print(f"Processing time: {proc_time}s")
+            results[scenario_name].append(proc_time)
+            time.sleep(1)  # Avoid file timestamp collision
+
+    # Plotting
+    plt.figure(figsize=(10, 6))
+    for scenario_name in results:
+        plt.plot(AGGREGATOR_COUNTS, results[scenario_name], marker='o', label=scenario_name)
+    plt.xlabel("Number of Aggregators")
+    plt.ylabel("Processing Time (s)")
+    plt.title("Processing Time vs. Number of Aggregators (clients=40)")
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plot_path = os.path.join(args.output_dir, "processing_time_vs_aggregators.png")
+    plt.savefig(plot_path)
+    print(f"Plot saved to {plot_path}")
+
+if __name__ == "__main__":
+    main() 

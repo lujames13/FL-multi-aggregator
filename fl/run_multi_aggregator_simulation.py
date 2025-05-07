@@ -45,6 +45,8 @@ def run_simulation(
     malicious_aggregator_ids: Optional[List[int]] = None,
     enable_challenges: bool = True,
     output_dir: str = "results",
+    challenge_frequency: float = 0.25,
+    challenge_mode: str = 'deterministic',
 ):
     """Run a single simulation with specified parameters using flwr run.
     
@@ -55,6 +57,8 @@ def run_simulation(
         malicious_aggregator_ids: List of aggregator IDs (0-indexed) that will produce malicious results
         enable_challenges: Whether to enable the challenge mechanism
         output_dir: Directory to save results
+        challenge_frequency: Challenge frequency: 0 for RR, 1 for PBFT, 0.25 for Hybrid
+        challenge_mode: Challenge mode: 'deterministic' or 'random'
         
     Returns:
         Path to the output file
@@ -80,7 +84,9 @@ def run_simulation(
         "num-aggregators": num_aggregators,
         "malicious-aggregators": malicious_str,
         "enable-challenges": enable_challenges,
-        "output-path": output_file
+        "output-path": output_file,
+        "challenge-frequency": challenge_frequency,
+        "challenge-mode": challenge_mode,
     }
     
     # Construct federation_config JSON
@@ -140,19 +146,47 @@ def run_research_scenarios(
     os.makedirs(output_dir, exist_ok=True)
     results = {}
     
-    # Scenario 1: All honest aggregators
-    logger.info("\n\n=== SCENARIO 1: All honest aggregators ===\n")
-    results["honest"] = run_simulation(
+    # Scenario 1: RR (no challenge)
+    logger.info("\n\n=== SCENARIO 1: RR (no challenge) ===\n")
+    results["rr"] = run_simulation(
+        num_clients=base_clients,
+        num_rounds=base_rounds,
+        num_aggregators=3,
+        malicious_aggregator_ids=None,
+        enable_challenges=False,
+        output_dir=output_dir,
+        challenge_frequency=0.0,
+        challenge_mode='deterministic',
+    )
+    
+    # Scenario 2: Hybrid (1/4 deterministic)
+    logger.info("\n\n=== SCENARIO 2: Hybrid (1/4 deterministic) ===\n")
+    results["hybrid"] = run_simulation(
         num_clients=base_clients,
         num_rounds=base_rounds,
         num_aggregators=3,
         malicious_aggregator_ids=None,
         enable_challenges=True,
         output_dir=output_dir,
+        challenge_frequency=0.25,
+        challenge_mode='deterministic',
     )
     
-    # Scenario 2: One malicious aggregator without challenges
-    logger.info("\n\n=== SCENARIO 2: One malicious aggregator (no challenges) ===\n")
+    # Scenario 3: PBFT (all challenged)
+    logger.info("\n\n=== SCENARIO 3: PBFT (all challenged) ===\n")
+    results["pbft"] = run_simulation(
+        num_clients=base_clients,
+        num_rounds=base_rounds,
+        num_aggregators=3,
+        malicious_aggregator_ids=None,
+        enable_challenges=True,
+        output_dir=output_dir,
+        challenge_frequency=1.0,
+        challenge_mode='deterministic',
+    )
+    
+    # Scenario 4: One malicious aggregator without challenges
+    logger.info("\n\n=== SCENARIO 4: One malicious aggregator (no challenges) ===\n")
     results["malicious_no_challenges"] = run_simulation(
         num_clients=base_clients,
         num_rounds=base_rounds,
@@ -160,10 +194,12 @@ def run_research_scenarios(
         malicious_aggregator_ids=[1],  # Make aggregator 1 malicious
         enable_challenges=False,
         output_dir=output_dir,
+        challenge_frequency=0.0,
+        challenge_mode='deterministic',
     )
     
-    # Scenario 3: One malicious aggregator with challenges
-    logger.info("\n\n=== SCENARIO 3: One malicious aggregator (with challenges) ===\n")
+    # Scenario 5: One malicious aggregator with challenges
+    logger.info("\n\n=== SCENARIO 5: One malicious aggregator (with challenges) ===\n")
     results["malicious_with_challenges"] = run_simulation(
         num_clients=base_clients,
         num_rounds=base_rounds,
@@ -171,10 +207,12 @@ def run_research_scenarios(
         malicious_aggregator_ids=[1],  # Make aggregator 1 malicious
         enable_challenges=True,
         output_dir=output_dir,
+        challenge_frequency=0.25,
+        challenge_mode='deterministic',
     )
     
-    # Scenario 4: Multiple malicious aggregators with challenges
-    logger.info("\n\n=== SCENARIO 4: Multiple malicious aggregators (with challenges) ===\n")
+    # Scenario 6: Multiple malicious aggregators with challenges
+    logger.info("\n\n=== SCENARIO 6: Multiple malicious aggregators (with challenges) ===\n")
     results["multiple_malicious"] = run_simulation(
         num_clients=base_clients,
         num_rounds=base_rounds,
@@ -182,13 +220,17 @@ def run_research_scenarios(
         malicious_aggregator_ids=[1, 3],  # Make aggregators 1 and 3 malicious
         enable_challenges=True,
         output_dir=output_dir,
+        challenge_frequency=0.25,
+        challenge_mode='deterministic',
     )
     
     # Save summary of all scenarios
     summary = {
         "timestamp": datetime.now().isoformat(),
         "scenarios": {
-            "honest": {"description": "All honest aggregators", "result_file": results.get("honest")},
+            "rr": {"description": "RR (no challenge)", "result_file": results.get("rr")},
+            "hybrid": {"description": "Hybrid (1/4 deterministic)", "result_file": results.get("hybrid")},
+            "pbft": {"description": "PBFT (all challenged)", "result_file": results.get("pbft")},
             "malicious_no_challenges": {
                 "description": "One malicious aggregator without challenges",
                 "result_file": results.get("malicious_no_challenges"),
@@ -270,6 +312,19 @@ def parse_args():
         action="store_true",
         help="Generate visualizations after simulation",
     )
+    parser.add_argument(
+        "--challenge-frequency",
+        type=float,
+        default=0.25,
+        help="Challenge frequency: 0 for RR, 1 for PBFT, 0.25 for Hybrid",
+    )
+    parser.add_argument(
+        "--challenge-mode",
+        type=str,
+        choices=["deterministic", "random"],
+        default="deterministic",
+        help="Challenge mode: 'deterministic' or 'random'",
+    )
     return parser.parse_args()
 
 
@@ -296,6 +351,8 @@ def main():
             malicious_aggregator_ids=malicious_ids,
             enable_challenges=enable_challenges,
             output_dir=args.output_dir,
+            challenge_frequency=args.challenge_frequency,
+            challenge_mode=args.challenge_mode,
         )
         
         if output_file and args.visualize:

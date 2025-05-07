@@ -21,12 +21,12 @@ from flwr.common import (
 )
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg, Strategy
-from .multi_aggregator_strategy import MultiAggregatorStrategy
+from .hybrid_strategy import HybridOptimisticPBFTAggregatorStrategy
 
 logger = logging.getLogger(__name__)
 
 
-class MultiAggregatorStrategy_v2(MultiAggregatorStrategy):
+class HybridOptimisticPBFTAggregatorStrategy_Rollback(HybridOptimisticPBFTAggregatorStrategy):
     """增強版多聚合器策略，支持延遲檢測、回滾機制，和惡意Aggregator剔除。"""
     
     def __init__(
@@ -35,6 +35,8 @@ class MultiAggregatorStrategy_v2(MultiAggregatorStrategy):
         malicious_aggregator_ids: List[int] = None,
         enable_challenges: bool = True,
         detection_delay: int = 2,  # 檢測延遲輪數
+        challenge_frequency: float = 0.25,  # 新增，0=RR, 1=PBFT, 0.25=Hybrid
+        challenge_mode: str = 'deterministic',  # 新增，'deterministic'或'random'
         **kwargs,
     ):
         """初始化增強版多聚合器策略。"""
@@ -56,6 +58,8 @@ class MultiAggregatorStrategy_v2(MultiAggregatorStrategy):
         self.total_rollbacks = 0  # 總回滾次數
         self.is_recovery_mode = False  # 是否處於恢復模式
         self.recovery_from_round = None  # 從哪一輪恢復
+        self.challenge_frequency = challenge_frequency
+        self.challenge_mode = challenge_mode
         
     def aggregate_fit(
         self,
@@ -187,20 +191,35 @@ class MultiAggregatorStrategy_v2(MultiAggregatorStrategy):
         # 存儲此輪的安全參數 (用於未來可能的恢復)
         self._store_safe_parameters(original_round, honest_parameters)
         
-        # 如果這是惡意聚合器，操縱結果
+        # 決定本輪是否 challenge
+        if is_malicious:
+            challenge_this_round = True
+        else:
+            if self.challenge_frequency <= 0:
+                challenge_this_round = False
+            elif self.challenge_frequency >= 1:
+                challenge_this_round = True
+            elif self.challenge_mode == 'deterministic':
+                # 每N輪challenge一次
+                N = int(1/self.challenge_frequency) if self.challenge_frequency > 0 else 999999
+                challenge_this_round = (original_round % N == 0)
+            elif self.challenge_mode == 'random':
+                challenge_this_round = (random.random() < self.challenge_frequency)
+            else:
+                challenge_this_round = False
+        
+        # 聚合行為
         if is_malicious:
             honest_ndarrays = parameters_to_ndarrays(honest_parameters)
             malicious_ndarrays = self._create_malicious_aggregation(honest_ndarrays)
             aggregated_parameters = ndarrays_to_parameters(malicious_ndarrays)
-            
-            # 添加標籤以識別惡意行為
             metrics = {
                 **honest_metrics,
                 "aggregator_id": self.current_aggregator_id,
                 "malicious": True,
+                "challenge": challenge_this_round,
                 "excluded_aggregators": list(self.excluded_aggregators)
             }
-            
             # 安排未來輪次的延遲檢測
             detection_round = original_round + self.detection_delay
             self.pending_detections[detection_round] = (
@@ -209,8 +228,6 @@ class MultiAggregatorStrategy_v2(MultiAggregatorStrategy):
                 honest_parameters
             )
             logger.info(f"輪 {original_round}: 惡意聚合器 {self.current_aggregator_id}，安排在輪 {detection_round} 進行檢測")
-            
-            # 增加攻擊情況下的總輪數計數
             self.total_rounds_with_attack += 1
         else:
             aggregated_parameters = honest_parameters
@@ -218,8 +235,17 @@ class MultiAggregatorStrategy_v2(MultiAggregatorStrategy):
                 **honest_metrics,
                 "aggregator_id": self.current_aggregator_id,
                 "malicious": False,
+                "challenge": challenge_this_round,
                 "excluded_aggregators": list(self.excluded_aggregators)
             }
+        
+        # 記錄本輪metrics
+        self.metrics_history.append({
+            "round": int(original_round),
+            "aggregator_id": int(self.current_aggregator_id),
+            "malicious": bool(is_malicious),
+            "challenge": bool(challenge_this_round)
+        })
         
         return aggregated_parameters, metrics
     

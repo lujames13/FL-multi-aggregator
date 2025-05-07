@@ -50,40 +50,58 @@ def save_research_data(
     run_config: Dict,
     file_path: Optional[Union[str, Path]] = None,
 ):
-    """Save research data to JSON file.
-    
-    Parameters
-    ----------
-    history: History
-        History returned by server.fit()
-    strategy: Strategy
-        The strategy instance (should be MultiAggregatorStrategy)
-    run_config: Dict
-        Configuration parameters for the run
-    file_path: Optional[Union[str, Path]]
-        Optional explicit file path. If not provided, it will be generated
-        from run_config or default location.
-    """
-    # Collect research data from strategy attributes
+    """Save research data to JSON file, including all relevant metrics and curves."""
     research_data = {}
 
-    # Collect metrics history if available
+    # 1. Collect metrics history (per-round)
     if hasattr(strategy, 'metrics_history'):
         research_data["metrics_history"] = getattr(strategy, "metrics_history", [])
-    if hasattr(strategy, 'challenged_rounds'):
-        research_data["challenged_rounds"] = list(getattr(strategy, "challenged_rounds", set()))
-    if hasattr(strategy, 'excluded_aggregators'):
-        research_data["excluded_aggregators"] = list(getattr(strategy, "excluded_aggregators", set()))
+
+    # 2. Collect accuracy/loss per round if available in metrics_history
+    accuracy_curve = []
+    loss_curve = []
+    if "metrics_history" in research_data:
+        for m in research_data["metrics_history"]:
+            if "accuracy" in m:
+                accuracy_curve.append({"round": m.get("round"), "accuracy": m["accuracy"]})
+            if "loss" in m:
+                loss_curve.append({"round": m.get("round"), "loss": m["loss"]})
+    if accuracy_curve:
+        research_data["accuracy_round_curve"] = accuracy_curve
+    if loss_curve:
+        research_data["loss_round_curve"] = loss_curve
+
+    # 3. Collect rollback/attack/exclusion info if available
+    if hasattr(strategy, 'total_rollbacks'):
+        research_data["total_rollbacks"] = getattr(strategy, "total_rollbacks", 0)
     if hasattr(strategy, 'detected_attacks'):
         research_data["detected_attacks"] = list(getattr(strategy, "detected_attacks", set()))
+    if hasattr(strategy, 'excluded_aggregators'):
+        research_data["excluded_aggregators"] = list(getattr(strategy, "excluded_aggregators", set()))
+
+    # 4. Collect processing time statistics
+    fit_times = []
+    eval_times = []
+    if "metrics_history" in research_data:
+        for m in research_data["metrics_history"]:
+            if "processing_time_fit" in m:
+                fit_times.append(m["processing_time_fit"])
+            if "processing_time_evaluate" in m:
+                eval_times.append(m["processing_time_evaluate"])
+    if fit_times:
+        research_data["avg_processing_time_fit"] = float(sum(fit_times) / len(fit_times))
+    if eval_times:
+        research_data["avg_processing_time_evaluate"] = float(sum(eval_times) / len(eval_times))
+
+    # 5. Collect other strategy attributes as before
+    if hasattr(strategy, 'challenged_rounds'):
+        research_data["challenged_rounds"] = list(getattr(strategy, "challenged_rounds", set()))
     if hasattr(strategy, 'original_rounds_map'):
         research_data["original_rounds_map"] = {str(k): v for k, v in getattr(strategy, "original_rounds_map", {}).items()}
     if hasattr(strategy, 'num_aggregators'):
         research_data["num_aggregators"] = getattr(strategy, "num_aggregators", None)
     if hasattr(strategy, 'malicious_aggregator_ids'):
         research_data["malicious_aggregator_ids"] = list(getattr(strategy, "malicious_aggregator_ids", []))
-    if hasattr(strategy, 'total_rollbacks'):
-        research_data["total_rollbacks"] = getattr(strategy, "total_rollbacks", 0)
     if hasattr(strategy, 'total_rounds_with_attack'):
         research_data["total_rounds_with_attack"] = getattr(strategy, "total_rounds_with_attack", 0)
     if hasattr(strategy, 'detection_delay'):
@@ -91,7 +109,7 @@ def save_research_data(
     if hasattr(strategy, 'round'):
         research_data["total_rounds"] = getattr(strategy, "round", 0)
 
-    # Derived metrics
+    # Derived metrics (as before)
     num_aggregators = research_data.get("num_aggregators", 0)
     excluded_aggregators = research_data.get("excluded_aggregators", [])
     total_rollbacks = research_data.get("total_rollbacks", 0)
@@ -102,8 +120,8 @@ def save_research_data(
     research_data["effective_training_rounds"] = total_rounds - total_rollbacks * detection_delay
     research_data["rollback_overhead_percentage"] = (total_rollbacks * detection_delay / total_rounds * 100) if total_rounds > 0 else 0
 
-    # Add history metrics
-    if history and history.metrics_distributed:
+    # Add history metrics (from flwr History)
+    if history and hasattr(history, 'metrics_distributed') and history.metrics_distributed:
         research_data["history"] = {
             "loss": history.metrics_distributed.get("loss", {}),
             "metrics_fit": history.metrics_distributed.get("metrics_fit", {}),
@@ -113,13 +131,11 @@ def save_research_data(
     # Add run configuration
     research_data["run_config"] = run_config
 
-    # Determine output path
+    # Determine output path (as before)
     if file_path is None:
-        # Use output-path from run_config if available
         if "output-path" in run_config:
             file_path = run_config["output-path"]
         else:
-            # Generate default path based on scenario parameters
             output_dir = run_config.get("output-dir", "results")
             num_aggregators = run_config.get("num-aggregators", 3)
             malicious_str = run_config.get("malicious-aggregators", "")
@@ -128,10 +144,7 @@ def save_research_data(
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = os.path.join(output_dir, f"research_data_{scenario_name}_{timestamp}.json")
 
-    # Ensure directory exists
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-    # Save to file
     with open(file_path, "w") as f:
         json.dump(research_data, f, indent=2)
 

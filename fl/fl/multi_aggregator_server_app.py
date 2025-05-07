@@ -9,8 +9,8 @@ from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
 from flwr.server.client_manager import SimpleClientManager
 
-from .multi_aggregator_strategy import MultiAggregatorStrategy
-from .multi_aggregator_strategy_v2 import MultiAggregatorStrategy_v2
+from .hybrid_strategy import HybridOptimisticPBFTAggregatorStrategy
+from .hybrid_strategy_rollback import HybridOptimisticPBFTAggregatorStrategy_Rollback
 from .server import MultiAggregatorResultsSaverServer, save_results_and_research_data
 from fl.task import Net, get_weights
 
@@ -25,7 +25,10 @@ def server_fn(context: Context):
     # Get multi-aggregator settings from config or use defaults
     num_aggregators = context.run_config.get("num-aggregators", 3)
     enable_challenges = context.run_config.get("enable-challenges", True)
-    
+    challenge_frequency = context.run_config.get("challenge-frequency", 0.25)
+    challenge_mode = context.run_config.get("challenge-mode", 'deterministic')
+    strategy_type = context.run_config.get("strategy-type", "hybrid")
+
     # Determine which aggregators are malicious (if any)
     malicious_aggregator_str = context.run_config.get("malicious-aggregators", "")
     malicious_aggregator_ids = []
@@ -40,18 +43,36 @@ def server_fn(context: Context):
     logger.info(f"Server starting with {num_aggregators} aggregators")
     logger.info(f"Malicious aggregators: {malicious_aggregator_ids}")
     logger.info(f"Challenge mechanism enabled: {enable_challenges}")
+    logger.info(f"Challenge frequency: {challenge_frequency}, Challenge mode: {challenge_mode}")
     logger.info(f"Running for {num_rounds} rounds with fraction_fit={fraction_fit}")
-    
-    # Define strategy
-    strategy = MultiAggregatorStrategy_v2(
-        num_aggregators=num_aggregators,
-        malicious_aggregator_ids=malicious_aggregator_ids,
-        enable_challenges=enable_challenges,
-        fraction_fit=fraction_fit,
-        fraction_evaluate=1.0,
-        min_available_clients=2,
-        initial_parameters=parameters,
-    )
+    logger.info(f"Strategy type selected: {strategy_type}")
+
+    # Define strategy based on type
+    if strategy_type == "rollback":
+        strategy = HybridOptimisticPBFTAggregatorStrategy_Rollback(
+            num_aggregators=num_aggregators,
+            malicious_aggregator_ids=malicious_aggregator_ids,
+            enable_challenges=enable_challenges,
+            challenge_frequency=challenge_frequency,
+            challenge_mode=challenge_mode,
+            detection_delay=context.run_config.get("detection-delay", 2),
+            fraction_fit=fraction_fit,
+            fraction_evaluate=1.0,
+            min_available_clients=2,
+            initial_parameters=parameters,
+        )
+    else:
+        strategy = HybridOptimisticPBFTAggregatorStrategy(
+            num_aggregators=num_aggregators,
+            malicious_aggregator_ids=malicious_aggregator_ids,
+            enable_challenges=enable_challenges,
+            challenge_frequency=challenge_frequency,
+            challenge_mode=challenge_mode,
+            fraction_fit=fraction_fit,
+            fraction_evaluate=1.0,
+            min_available_clients=2,
+            initial_parameters=parameters,
+        )
     
     # Create client manager
     client_manager = SimpleClientManager()
