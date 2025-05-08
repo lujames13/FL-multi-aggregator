@@ -56,13 +56,29 @@ def save_research_data(
 
     # 1. Collect metrics history (per-round)
     if hasattr(strategy, 'metrics_history'):
-        research_data["metrics_history"] = getattr(strategy, "metrics_history", [])
+        detailed_history = getattr(strategy, "metrics_history", [])
+        research_data["detailed_history"] = detailed_history
+        
+        # Add aggregated network delay metrics
+        if detailed_history:
+            total_network_delays = [m.get("total_network_delay", 0) for m in detailed_history 
+                                   if "total_network_delay" in m]
+            if total_network_delays:
+                research_data["avg_network_delay"] = float(sum(total_network_delays) / len(total_network_delays))
+                research_data["total_network_delay"] = float(sum(total_network_delays))
+            
+            # Add computation time metrics
+            computation_times = [m.get("computation_time", 0) for m in detailed_history 
+                                if "computation_time" in m]
+            if computation_times:
+                research_data["avg_computation_time"] = float(sum(computation_times) / len(computation_times))
+                research_data["total_computation_time"] = float(sum(computation_times))
 
     # 2. Collect accuracy/loss per round if available in metrics_history
     accuracy_curve = []
     loss_curve = []
-    if "metrics_history" in research_data:
-        for m in research_data["metrics_history"]:
+    if "detailed_history" in research_data:
+        for m in research_data["detailed_history"]:
             if "accuracy" in m:
                 accuracy_curve.append({"round": m.get("round"), "accuracy": m["accuracy"]})
             if "loss" in m:
@@ -83,8 +99,8 @@ def save_research_data(
     # 4. Collect processing time statistics
     fit_times = []
     eval_times = []
-    if "metrics_history" in research_data:
-        for m in research_data["metrics_history"]:
+    if "detailed_history" in research_data:
+        for m in research_data["detailed_history"]:
             if "processing_time_fit" in m:
                 fit_times.append(m["processing_time_fit"])
             if "processing_time_evaluate" in m:
@@ -109,6 +125,14 @@ def save_research_data(
         research_data["detection_delay"] = getattr(strategy, "detection_delay", 0)
     if hasattr(strategy, 'round'):
         research_data["total_rounds"] = getattr(strategy, "round", 0)
+    
+    # 6. Add PBFT-specific metrics if available
+    if hasattr(strategy, 'challenge_frequency'):
+        research_data["challenge_frequency"] = getattr(strategy, "challenge_frequency", 0)
+    if hasattr(strategy, 'challenge_mode'):
+        research_data["challenge_mode"] = getattr(strategy, "challenge_mode", "")
+    if hasattr(strategy, 'network_delay_factor'):
+        research_data["network_delay_factor"] = getattr(strategy, "network_delay_factor", 0)
 
     # Derived metrics (as before)
     num_aggregators = research_data.get("num_aggregators", 0)
@@ -132,10 +156,10 @@ def save_research_data(
     # Add run configuration
     research_data["run_config"] = run_config
 
-    # 新增：儲存 scenario 參數
+    # Ensure scenario parameter is included
     if "scenario" in run_config:
         research_data["scenario"] = run_config["scenario"]
-
+    
     # Add total elapsed time if provided
     if elapsed_time is not None:
         research_data["total_elapsed_time_sec"] = elapsed_time
