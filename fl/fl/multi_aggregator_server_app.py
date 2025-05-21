@@ -3,7 +3,9 @@
 import logging
 import json
 import os
+import sys
 from typing import Dict, List
+import argparse
 
 from flwr.common import Context, ndarrays_to_parameters
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
@@ -18,20 +20,33 @@ logger = logging.getLogger(__name__)
 
 def server_fn(context: Context):
     """Server function for the Flower server."""
+    # 解析 CLI 傳入的 --run-config
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run-config", type=str, default="")
+    args, _ = parser.parse_known_args()
+    if args.run_config:
+        cli_config = json.loads(args.run_config)
+        print("DEBUG: Detected CLI run-config:", cli_config)
+        # 強制 merge，CLI 參數優先
+        context.run_config.update(cli_config)
+    print("DEBUG: (after merge) context.run_config =", context.run_config)
+
+    logger.info(f"DEBUG: context.run_config = {context.run_config}")
+
     # Read from config
-    num_rounds = context.run_config["num-server-rounds"]
-    fraction_fit = context.run_config["fraction-fit"]
+    num_rounds = context.run_config.get("num_rounds", 3)
+    fraction_fit = context.run_config.get("fraction_fit", 0.5)
     
     # Get multi-aggregator settings from config or use defaults
-    num_aggregators = context.run_config.get("num-aggregators", 3)
-    enable_challenges = context.run_config.get("enable-challenges", True)
-    challenge_frequency = context.run_config.get("challenge-frequency", 0.25)
-    challenge_mode = context.run_config.get("challenge-mode", 'deterministic')
-    strategy_type = context.run_config.get("strategy-type", "hybrid")
-    network_delay_factor = context.run_config.get("network-delay-factor", 0.05)
+    num_aggregators = context.run_config.get("num_aggregators", 3)
+    enable_challenges = context.run_config.get("enable_challenges", True)
+    challenge_frequency = context.run_config.get("challenge_frequency", 0.25)
+    challenge_mode = context.run_config.get("challenge_mode", 'deterministic')
+    strategy_type = context.run_config.get("strategy_type", "hybrid")
+    network_delay_factor = context.run_config.get("network_delay_factor", 0.05)
 
     # Determine which aggregators are malicious (if any)
-    malicious_aggregator_str = context.run_config.get("malicious-aggregators", "")
+    malicious_aggregator_str = context.run_config.get("malicious_aggregators", "")
     malicious_aggregator_ids = []
     if malicious_aggregator_str:
         malicious_aggregator_ids = [int(x) for x in malicious_aggregator_str.split(",")]

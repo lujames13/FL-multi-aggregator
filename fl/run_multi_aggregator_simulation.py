@@ -48,39 +48,16 @@ def run_simulation(
     challenge_frequency: float = 0.25,
     challenge_mode: str = 'deterministic',
 ):
-    """Run a single simulation with specified parameters using flwr run.
-    
-    Args:
-        num_clients: Number of federated learning clients
-        num_rounds: Number of federated learning rounds
-        num_aggregators: Number of virtual aggregators
-        malicious_aggregator_ids: List of aggregator IDs (0-indexed) that will produce malicious results
-        enable_challenges: Whether to enable the challenge mechanism
-        output_dir: Directory to save results
-        challenge_frequency: Challenge frequency: 0 for RR, 1 for PBFT, 0.25 for Hybrid
-        challenge_mode: Challenge mode: 'deterministic' or 'random'
-        
-    Returns:
-        Path to the output file
-    """
-    # Create output directory
+    """Run a single simulation with specified parameters using flwr run."""
     os.makedirs(output_dir, exist_ok=True)
-    
-    # Format malicious aggregators as comma-separated string
     malicious_str = ",".join(map(str, malicious_aggregator_ids)) if malicious_aggregator_ids else ""
-    
-    # Create unique scenario name
     scenario_name = f"aggs{num_aggregators}_mal{malicious_str.replace(',', '_')}_chal{'on' if enable_challenges else 'off'}"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # Output file path
     output_file = os.path.join(output_dir, f"research_data_{scenario_name}_{timestamp}.json")
-    
-    # Construct run_config JSON
     run_config = {
         "num-server-rounds": num_rounds,
         "fraction-fit": 0.5,
-        "local-epochs": 1,
+        "local_epochs": 1,
         "num-aggregators": num_aggregators,
         "malicious-aggregators": malicious_str,
         "enable-challenges": enable_challenges,
@@ -88,17 +65,11 @@ def run_simulation(
         "challenge-frequency": challenge_frequency,
         "challenge-mode": challenge_mode,
     }
-    
-    # Construct federation_config JSON
     federation_config = {
         "num-supernodes": num_clients
     }
-    
-    # Convert to JSON strings
     run_config_json = json.dumps(run_config)
     federation_config_json = json.dumps(federation_config)
-    
-    # Log the configuration
     logger.info(f"Running simulation with:")
     logger.info(f"  - Clients: {num_clients}")
     logger.info(f"  - Rounds: {num_rounds}")
@@ -106,17 +77,11 @@ def run_simulation(
     logger.info(f"  - Malicious: {malicious_str if malicious_str else 'None'}")
     logger.info(f"  - Challenges: {'Enabled' if enable_challenges else 'Disabled'}")
     logger.info(f"  - Output file: {output_file}")
-    
-    # Construct the flwr run command
     cmd = [
         "flwr", "run",
-        # "--server-app", "fl/fl/multi_aggregator_server_app.py",
-        # "--client-app", "fl/fl/client_app.py",
         "--run-config", run_config_json,
         "--federation-config", federation_config_json
     ]
-    
-    # Run the command
     logger.info(f"Executing: {' '.join(cmd)}")
     try:
         subprocess.run(cmd, check=True)
@@ -124,11 +89,7 @@ def run_simulation(
     except subprocess.CalledProcessError as e:
         logger.error(f"Simulation failed with error: {e}")
         return None
-    
-    # Check if output file was created
-    if not os.path.exists(output_file):
-        logger.warning(f"Output file {output_file} not found. Make sure your server app saves research data.")
-    
+    # 不再於此檢查或讀取 output_file，數據收集交由集中模組
     return output_file
 
 

@@ -156,6 +156,9 @@ def save_research_data(
     # Add run configuration
     research_data["run_config"] = run_config
 
+    # 新增：將 run_config 寫入 metadata 欄位，方便下游分類
+    research_data["metadata"] = run_config.copy() if run_config is not None else {}
+
     # Ensure scenario parameter is included
     if "scenario" in run_config:
         research_data["scenario"] = run_config["scenario"]
@@ -166,14 +169,15 @@ def save_research_data(
 
     # Determine output path (as before)
     if file_path is None:
-        if "output-path" in run_config:
-            file_path = run_config["output-path"]
+        if "output_path" in run_config:
+            file_path = run_config["output_path"]
         else:
-            output_dir = run_config.get("output-dir", "results")
-            num_aggregators = run_config.get("num-aggregators", 3)
-            malicious_str = run_config.get("malicious-aggregators", "")
-            enable_challenges = run_config.get("enable-challenges", True)
-            scenario_name = f"aggs{num_aggregators}_mal{malicious_str.replace(',', '_')}_chal{'on' if enable_challenges else 'off'}"
+            output_dir = run_config.get("output_dir", "results")
+            num_aggregators = run_config.get("num_aggregators", 3)
+            malicious_str = run_config.get("malicious_aggregators", "")
+            enable_challenges = run_config.get("enable_challenges", True)
+            scenario = run_config.get("scenario", "unknown")
+            scenario_name = f"{scenario}_aggs{num_aggregators}_mal{malicious_str.replace(',', '_')}_chal{'on' if enable_challenges else 'off'}"
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = os.path.join(output_dir, f"research_data_{scenario_name}_{timestamp}.json")
 
@@ -231,7 +235,7 @@ def save_results_and_research_data(history, strategy, run_config, elapsed_time=N
     json_path = save_research_data(history, strategy, run_config, elapsed_time=elapsed_time)
     
     # Optionally save full history as pickle (useful for detailed analysis)
-    output_dir = run_config.get("output-dir", "results")
+    output_dir = run_config.get("output_dir", "results")
     pickle_path = os.path.join(output_dir, "history_pickles")
     
     # Extract scenario name from json_path

@@ -9,20 +9,20 @@ from fl.task import Net, get_weights, load_data, set_weights, test, train
 
 # Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
-    def __init__(self, net, trainloader, valloader, local_epochs):
+    def __init__(self, net, trainloader, valloader):
         self.net = net
         self.trainloader = trainloader
         self.valloader = valloader
-        self.local_epochs = local_epochs
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.net.to(self.device)
 
     def fit(self, parameters, config):
         set_weights(self.net, parameters)
+        local_epochs = config.get("local_epochs", 1)  # 預設 1
         train_loss = train(
             self.net,
             self.trainloader,
-            self.local_epochs,
+            local_epochs,
             self.device,
         )
         return (
@@ -45,10 +45,7 @@ def client_fn(context: Context):
     partition_id = int(partition_id)  # Ensure int type
     num_partitions = int(num_partitions)  # Ensure int type
     trainloader, valloader = load_data(partition_id, num_partitions)
-    local_epochs = context.run_config["local-epochs"]
-
-    # Return Client instance
-    return FlowerClient(net, trainloader, valloader, local_epochs).to_client()
+    return FlowerClient(net, trainloader, valloader).to_client()
 
 
 # Flower ClientApp
