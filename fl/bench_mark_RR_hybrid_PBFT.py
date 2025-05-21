@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Benchmark RR, Hybrid, PBFT processing time vs. number of aggregators.
+Benchmark RR, Optimistic, PBFT processing time vs. number of aggregators.
 
 Runs simulations with clients=40 and aggregators in [5, 10, 15, 20, 25],
-for each of RR (no challenge), Hybrid (0.25), PBFT (1.0).
+for each of RR (no challenge), Optimistic (0.25), PBFT (1.0).
 Plots processing time (s) vs. aggregators for all three methods.
 
 Usage:
-    python bench_mark_RR_hybrid_PBFT.py --rounds 3 --output-dir results
+    python bench_mark_RR_Optimistic_PBFT.py --rounds 3 --output-dir results
 """
 import os
 import subprocess
@@ -20,7 +20,7 @@ from fl.server import save_research_data  # 集中數據收集模組
 AGGREGATOR_COUNTS = [5, 10, 15, 20, 25]
 SCENARIOS = [
     ("RR", False, 0.0),
-    ("Hybrid", True, 0.25),
+    ("Optimistic", True, 0.25),
     ("PBFT", True, 1.0),
 ]
 
@@ -78,7 +78,7 @@ def collect_processing_time_by_scenario(output_dir, run_config):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Benchmark RR, Hybrid, PBFT processing time vs. aggregators.")
+    parser = argparse.ArgumentParser(description="Benchmark RR, Optimistic, PBFT processing time vs. aggregators.")
     parser.add_argument("--clients", type=int, default=40, help="Number of clients (default: 40)")
     parser.add_argument("--rounds", type=int, default=3, help="Number of rounds (default: 3)")
     parser.add_argument("--output-dir", type=str, default="results", help="Directory to save results")
@@ -110,7 +110,7 @@ def main():
 
     # Plotting
     plt.figure(figsize=(10, 6))
-    for scenario_name in ["RR", "Hybrid", "PBFT"]:
+    for scenario_name in ["RR", "Optimistic", "PBFT"]:
         if scenario_name in results:
             y = [results[scenario_name].get(agg, None) for agg in AGGREGATOR_COUNTS]
             plt.plot(AGGREGATOR_COUNTS, y, marker='o', label=scenario_name)
